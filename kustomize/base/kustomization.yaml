@@ -15,7 +15,7 @@ commonLabels:
   app.kubernetes.io/name: cairn
   app.kubernetes.io/instance: cairn
   app.kubernetes.io/managed-by: kustomize
-  app.kubernetes.io/version: "0.0.2-alpha"
+  app.kubernetes.io/version: "0.1.0"
   app.kubernetes.io/part-of: cairn-cloud
 
 resources:
@@ -28,4 +28,4 @@ resources:
 images:
   - name: cairn
     newName: ghcr.io/cairn-geocoder/cairn
-    newTag: "0.0.2-alpha"
+    newTag: "0.1.0"

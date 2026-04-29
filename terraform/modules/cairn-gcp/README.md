@@ -29,7 +29,7 @@ module "cairn" {
   project_id        = "my-gcp-project"
   region            = "europe-west6"
   bundle_gcs_bucket = "cairn-bundles"
-  bundle_object     = "switzerland-v0.0.2-alpha.tar.gz"
+  bundle_object     = "switzerland-v0.1.0.tar.gz"
   bundle_sha256     = "<sha256-of-the-tarball>"
 
   min_instances = 1   # avoid cold start

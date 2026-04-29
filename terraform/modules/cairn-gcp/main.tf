@@ -20,7 +20,7 @@
 #
 # CAUTION: this assumes the cairn image has `wget` or `curl`. The
 # upstream `ghcr.io/cairn-geocoder/cairn` image ships curl as of
-# 0.0.2-alpha specifically to support this flow.
+# 0.1.0 specifically to support this flow.
 
 resource "google_service_account" "this" {
   project      = var.project_id

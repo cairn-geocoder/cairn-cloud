@@ -32,7 +32,7 @@ module "cairn" {
   datacenters = ["dc1"]
   count       = 2
 
-  bundle_url    = "https://bundles.example.com/cairn/switzerland-v0.0.2-alpha.tar.gz"
+  bundle_url    = "https://bundles.example.com/cairn/switzerland-v0.1.0.tar.gz"
   bundle_sha256 = "<sha256>"
 }
 ```

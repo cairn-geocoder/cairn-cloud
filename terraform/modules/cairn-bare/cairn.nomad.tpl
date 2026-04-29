@@ -25,7 +25,7 @@ job "${name}" {
     service {
       name = "${name}"
       port = "http"
-      tags = ["cairn", "geocoder", "v0.0.2-alpha"]
+      tags = ["cairn", "geocoder", "v0.1.0"]
 
       check {
         name     = "healthz"

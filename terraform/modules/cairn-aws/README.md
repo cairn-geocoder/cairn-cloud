@@ -26,7 +26,7 @@ module "cairn" {
   public_subnet_ids   = aws_subnet.public[*].id
   private_subnet_ids  = aws_subnet.private[*].id
 
-  bundle_url    = "https://bundles.example.com/cairn/switzerland-v0.0.2-alpha.tar.gz"
+  bundle_url    = "https://bundles.example.com/cairn/switzerland-v0.1.0.tar.gz"
   bundle_sha256 = "<sha256-of-the-tarball>"
 
   desired_count = 2

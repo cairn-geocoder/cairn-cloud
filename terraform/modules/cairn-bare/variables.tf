@@ -19,7 +19,7 @@ variable "namespace" {
 variable "image" {
   description = "Container image for cairn-serve."
   type        = string
-  default     = "ghcr.io/cairn-geocoder/cairn:0.0.2-alpha"
+  default     = "ghcr.io/cairn-geocoder/cairn:0.1.0"
 }
 
 variable "bundle_url" {

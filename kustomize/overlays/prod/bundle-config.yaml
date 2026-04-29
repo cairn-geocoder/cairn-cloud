@@ -6,5 +6,5 @@ kind: ConfigMap
 metadata:
   name: cairn-bundle-config
 data:
-  bundle_url:    "https://bundles.example.com/cairn/switzerland-v0.0.2-alpha.tar.gz"
+  bundle_url:    "https://bundles.example.com/cairn/switzerland-v0.1.0.tar.gz"
   bundle_sha256: "REPLACE_WITH_REAL_SHA256_AT_RELEASE_TIME"

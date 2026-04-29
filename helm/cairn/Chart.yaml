@@ -10,10 +10,10 @@ type: application
 
 # Chart version. Bump on EVERY release. Independent of appVersion so
 # operators can iterate Helm templates without bumping the geocoder.
-version: 0.1.0
+version: 0.1.1
 
 # Cairn release this chart targets. Pinned to the upstream release tag.
-appVersion: "0.0.2-alpha"
+appVersion: "0.1.0"
 
 kubeVersion: ">=1.27.0-0"
 
@@ -38,5 +38,7 @@ maintainers:
 annotations:
   artifacthub.io/license: MIT
   artifacthub.io/changes: |
+    - kind: changed
+      description: Pin appVersion + module image / bundle defaults to upstream cairn v0.1.0 (first public beta).
     - kind: added
       description: Initial Helm chart release for cairn-serve.

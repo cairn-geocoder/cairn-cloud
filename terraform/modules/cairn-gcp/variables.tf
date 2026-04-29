@@ -18,7 +18,7 @@ variable "region" {
 variable "image" {
   description = "Container image. Cloud Run requires the image to be in a registry the service account can pull from (Artifact Registry, GCR, or — in newer GCP — public ghcr.io is fine for image versions tagged immutable)."
   type        = string
-  default     = "ghcr.io/cairn-geocoder/cairn:0.0.2-alpha"
+  default     = "ghcr.io/cairn-geocoder/cairn:0.1.0"
 }
 
 variable "bundle_gcs_bucket" {

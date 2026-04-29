@@ -66,7 +66,7 @@ spec:
 
       containers:
         - name: cairn
-          image: cairn:0.0.2-alpha     # patched by base kustomization.yaml
+          image: cairn:0.1.0     # patched by base kustomization.yaml
           imagePullPolicy: IfNotPresent
           args:
             - --bundle

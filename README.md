@@ -79,7 +79,7 @@ module "cairn" {
   vpc_id             = aws_vpc.this.id
   public_subnet_ids  = aws_subnet.public[*].id
   private_subnet_ids = aws_subnet.private[*].id
-  bundle_url         = "https://bundles.example.com/cairn/switzerland-v0.0.2-alpha.tar.gz"
+  bundle_url         = "https://bundles.example.com/cairn/switzerland-v0.1.0.tar.gz"
   bundle_sha256      = "<sha256>"
 }
 
@@ -88,13 +88,13 @@ module "cairn" {
   source            = "github.com/cairn-geocoder/cairn-cloud//terraform/modules/cairn-gcp?ref=main"
   project_id        = "my-gcp-project"
   bundle_gcs_bucket = "cairn-bundles"
-  bundle_object     = "switzerland-v0.0.2-alpha.tar.gz"
+  bundle_object     = "switzerland-v0.1.0.tar.gz"
 }
 
 # Nomad + Consul — kubernetes-free path
 module "cairn" {
   source         = "github.com/cairn-geocoder/cairn-cloud//terraform/modules/cairn-bare?ref=main"
-  bundle_url     = "https://bundles.example.com/cairn/switzerland-v0.0.2-alpha.tar.gz"
+  bundle_url     = "https://bundles.example.com/cairn/switzerland-v0.1.0.tar.gz"
   bundle_sha256  = "<sha256>"
   instance_count = 2
 }

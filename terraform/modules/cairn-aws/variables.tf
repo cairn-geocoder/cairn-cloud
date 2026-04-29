@@ -28,7 +28,7 @@ variable "internal_alb" {
 variable "image" {
   description = "Container image for cairn-serve. Pin a digest in production."
   type        = string
-  default     = "ghcr.io/cairn-geocoder/cairn:0.0.2-alpha"
+  default     = "ghcr.io/cairn-geocoder/cairn:0.1.0"
 }
 
 variable "bundle_url" {
