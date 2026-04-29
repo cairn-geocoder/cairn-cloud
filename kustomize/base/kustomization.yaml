@@ -1,0 +1,31 @@
+# Cairn Kustomize base. Plain Kubernetes manifests for operators who
+# don't want Helm. Overlays in ../overlays/{dev,prod}/ adjust replicas,
+# ingress, autoscaling, and network policy without touching base.
+#
+# Image + bundle URL are placeholders — every overlay overrides via
+# `images:` + a ConfigMap patch. Don't `kubectl apply -k base/`
+# directly in production; pick an overlay.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cairn
+
+commonLabels:
+  app.kubernetes.io/name: cairn
+  app.kubernetes.io/instance: cairn
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/version: "0.0.2-alpha"
+  app.kubernetes.io/part-of: cairn-cloud
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - configmap-fetch.yaml
+  - service.yaml
+  - deployment.yaml
+
+images:
+  - name: cairn
+    newName: ghcr.io/cairn-geocoder/cairn
+    newTag: "0.0.2-alpha"

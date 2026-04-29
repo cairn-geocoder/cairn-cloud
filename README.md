@@ -45,13 +45,29 @@ signature-verification path.
 
 | Path | Status |
 |---|---|
-| `helm/cairn/`                   | **shipped** — initial v0.1.0 |
-| `kustomize/`                    | scoped, not implemented |
+| `helm/cairn/`                   | **shipped** — chart v0.1.0, OCI on `ghcr.io/cairn-geocoder/charts/cairn` |
+| `kustomize/base/`               | **shipped** — flat manifests (Namespace + SA + CM x2 + Svc + Deployment) |
+| `kustomize/overlays/dev/`       | **shipped** — single replica, NodePort :30080, no ingress |
+| `kustomize/overlays/prod/`      | **shipped** — 3 replicas, HPA, PDB, Ingress, NetworkPolicy egress lockdown |
 | `terraform/modules/cairn-aws/`  | scoped, not implemented |
 | `terraform/modules/cairn-gcp/`  | scoped, not implemented |
 | `terraform/modules/cairn-bare/` | scoped, not implemented |
 | `observability/`                | scoped, not implemented |
 | `examples/`                     | scoped, not implemented |
+
+## Kustomize quickstart
+
+```sh
+# Dev — single replica, NodePort :30080, default-deny PSA
+kubectl apply -k kustomize/overlays/dev
+
+# Prod — 3 replicas, HPA, PDB, Ingress, NetworkPolicy, topology spread
+kubectl apply -k kustomize/overlays/prod
+```
+
+Edit the `cairn-bundle-config` ConfigMap in the overlay you're using
+to point at your bundle URL + sha256 before applying. The
+`bundle-fetch` init container fails closed on sha256 mismatch.
 
 Contributions for any of the unimplemented paths are welcome — see
 [`CONTRIBUTING.md`](CONTRIBUTING.md).

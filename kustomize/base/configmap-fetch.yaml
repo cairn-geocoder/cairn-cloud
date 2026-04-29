@@ -1,0 +1,34 @@
+# Bundle fetch script. Pulls a tar.gz from a URL into /bundle and
+# verifies an optional SHA-256. Overlays patch CAIRN_BUNDLE_URL +
+# CAIRN_BUNDLE_SHA256 at apply time; the script reads them via env.
+#
+# Operators who already host the bundle on a PVC or bake it into the
+# image can replace the init container in their overlay; the
+# Deployment in base/ just wires the URL path because it's the
+# common case.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cairn-bundle-fetch
+data:
+  fetch.sh: |
+    #!/bin/sh
+    set -eu
+    : "${CAIRN_BUNDLE_URL:?CAIRN_BUNDLE_URL is required}"
+    : "${CAIRN_BUNDLE_SHA256:=}"
+    DEST=/bundle
+
+    cd /tmp
+    echo ">> downloading $CAIRN_BUNDLE_URL"
+    if command -v curl >/dev/null 2>&1; then
+      curl -fSL --retry 3 -o bundle.tar.gz "$CAIRN_BUNDLE_URL"
+    else
+      wget -O bundle.tar.gz "$CAIRN_BUNDLE_URL"
+    fi
+    if [ -n "$CAIRN_BUNDLE_SHA256" ]; then
+      echo "$CAIRN_BUNDLE_SHA256  bundle.tar.gz" | sha256sum -c -
+    fi
+    mkdir -p "$DEST"
+    tar -C "$DEST" --strip-components=1 -xzf bundle.tar.gz
+    rm -f bundle.tar.gz
+    echo ">> bundle ready at $DEST"

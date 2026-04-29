@@ -1,0 +1,21 @@
+# Dev overlay — single replica, NodePort service, no ingress, no
+# autoscaling, no PDB. Cheap path for kind / minikube / k3s.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cairn-dev
+
+resources:
+  - ../../base
+  - bundle-config.yaml
+
+namePrefix: dev-
+
+commonAnnotations:
+  cairn.kaldera.dev/environment: dev
+
+patches:
+  - path: service-nodeport.yaml
+    target:
+      kind: Service
+      name: cairn

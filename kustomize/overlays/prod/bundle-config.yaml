@@ -1,0 +1,10 @@
+# Prod bundle pointer. Pin the SHA-256 — the init container fails
+# closed on mismatch. Operators rotating bundles bump both URL and
+# sha256 atomically.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cairn-bundle-config
+data:
+  bundle_url:    "https://bundles.example.com/cairn/switzerland-v0.0.2-alpha.tar.gz"
+  bundle_sha256: "REPLACE_WITH_REAL_SHA256_AT_RELEASE_TIME"

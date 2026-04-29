@@ -1,0 +1,10 @@
+# Dev bundle pointer. Tiny country PBF works for kind / minikube
+# clusters with limited disk. Replace with whatever you mirror
+# locally; a pinned sha256 is optional in dev.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cairn-bundle-config
+data:
+  bundle_url: "https://example.invalid/liechtenstein-dev.tar.gz"
+  bundle_sha256: ""

@@ -1,0 +1,25 @@
+# Replace host + tls cert references with your real values before
+# `kubectl apply`. We don't ship a default annotation set because
+# ingress-controller annotations vary per provider (nginx-ingress,
+# AWS LB Controller, GKE GCE, Traefik, …).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cairn
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - cairn.example.com
+      secretName: cairn-tls
+  rules:
+    - host: cairn.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cairn
+                port:
+                  number: 80

@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cairn
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cairn
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cairn
+    spec:
+      serviceAccountName: cairn
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+
+      initContainers:
+        # Pulls + (optionally) sha256-verifies the bundle into a shared
+        # emptyDir before cairn-serve starts. Overlays set the URL +
+        # checksum via the env-from-configmap below, OR override this
+        # initContainer entirely if they're using a PVC / image bundle.
+        - name: bundle-fetch
+          image: alpine/curl:8
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "/scripts/fetch.sh"]
+          env:
+            - name: CAIRN_BUNDLE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: cairn-bundle-config
+                  key: bundle_url
+                  optional: false
+            - name: CAIRN_BUNDLE_SHA256
+              valueFrom:
+                configMapKeyRef:
+                  name: cairn-bundle-config
+                  key: bundle_sha256
+                  optional: true
+          volumeMounts:
+            - name: bundle
+              mountPath: /bundle
+            - name: bundle-fetch-script
+              mountPath: /scripts
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+
+      containers:
+        - name: cairn
+          image: cairn:0.0.2-alpha     # patched by base kustomization.yaml
+          imagePullPolicy: IfNotPresent
+          args:
+            - --bundle
+            - /bundle
+            - --bind
+            - 0.0.0.0:8080
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: bundle
+              mountPath: /bundle
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: bundle
+          emptyDir:
+            sizeLimit: 4Gi
+        - name: bundle-fetch-script
+          configMap:
+            name: cairn-bundle-fetch
+            defaultMode: 0555
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

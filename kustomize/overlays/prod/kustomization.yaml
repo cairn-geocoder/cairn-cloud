@@ -1,0 +1,24 @@
+# Prod overlay — 3 replicas, HPA on CPU, PodDisruptionBudget,
+# NetworkPolicy locking pod egress to DNS + the bundle host, plus an
+# Ingress. Image pin moves to a digest at release time.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cairn-prod
+
+resources:
+  - ../../base
+  - bundle-config.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+
+commonAnnotations:
+  cairn.kaldera.dev/environment: prod
+
+patches:
+  - path: deployment-replicas.yaml
+    target:
+      kind: Deployment
+      name: cairn
