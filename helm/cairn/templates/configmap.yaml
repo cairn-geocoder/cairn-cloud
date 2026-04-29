@@ -1,0 +1,43 @@
+{{- if eq .Values.bundle.source "http" -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cairn.fullname" . }}-bundle-fetch
+  labels:
+    {{- include "cairn.labels" . | nindent 4 }}
+data:
+  fetch.sh: |
+    #!/bin/sh
+    # Bundle init-container script. Pulls the configured bundle URL,
+    # optionally verifies the SHA-256, and untars into /bundle. The
+    # main cairn-serve container mounts /bundle read-only afterwards.
+    set -eu
+    URL='{{ .Values.bundle.http.url }}'
+    SHA256='{{ .Values.bundle.http.sha256 }}'
+    DEST=/bundle
+
+    if [ -z "$URL" ]; then
+      echo "FATAL: bundle.http.url is empty" >&2
+      exit 1
+    fi
+
+    cd /tmp
+    echo ">> downloading $URL"
+    if command -v curl >/dev/null 2>&1; then
+      curl -fSL --retry 3 -o bundle.tar.gz "$URL"
+    else
+      wget -O bundle.tar.gz "$URL"
+    fi
+
+    if [ -n "$SHA256" ]; then
+      echo "$SHA256  bundle.tar.gz" | sha256sum -c -
+    fi
+
+    echo ">> extracting to $DEST"
+    mkdir -p "$DEST"
+    tar -C "$DEST" --strip-components=1 -xzf bundle.tar.gz
+    rm -f bundle.tar.gz
+
+    echo ">> bundle ready at $DEST"
+    ls -lh "$DEST" | head
+{{- end }}

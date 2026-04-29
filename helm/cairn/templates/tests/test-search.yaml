@@ -1,0 +1,35 @@
+# `helm test <release>` smoke check. Spawns a one-shot pod that hits
+# /healthz then /v1/search?q=test against the in-cluster service. Pass
+# = HTTP 200 from both. Cairn-serve answers /healthz before the bundle
+# loads, so the second curl validates the bundle init-container path.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "cairn.fullname" . }}-test-search"
+  labels:
+    {{- include "cairn.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: hook-succeeded,before-hook-creation
+spec:
+  restartPolicy: Never
+  containers:
+    - name: probe
+      image: alpine/curl:8
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -eu
+          host="{{ include "cairn.fullname" . }}:{{ .Values.service.port }}"
+          echo ">> probing healthz"
+          curl -fsS "http://$host/healthz" >/dev/null
+          echo ">> probing /v1/search?q=test"
+          # Don't fail on empty results — fixture bundles vary. We
+          # just want HTTP 200 + valid JSON envelope.
+          out=$(curl -fsS "http://$host/v1/search?q=test")
+          echo "$out" | head -c 200
+          case "$out" in
+            *results*) echo " ok";;
+            *) echo " unexpected response shape" >&2; exit 1;;
+          esac

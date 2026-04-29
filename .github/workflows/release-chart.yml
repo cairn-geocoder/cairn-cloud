@@ -1,0 +1,45 @@
+name: release-chart
+
+on:
+  push:
+    tags:
+      - "chart/cairn/v*"     # e.g. chart/cairn/v0.1.0
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  oci-push:
+    name: Publish to ghcr.io OCI registry
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package + push chart
+        run: |
+          set -eu
+          helm package helm/cairn --destination /tmp/dist
+          ls /tmp/dist
+          for f in /tmp/dist/*.tgz; do
+            helm push "$f" oci://ghcr.io/cairn-geocoder/charts
+          done
+
+      - name: GitHub Release attachment
+        if: startsWith(github.ref, 'refs/tags/chart/cairn/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: /tmp/dist/*.tgz
+          generate_release_notes: true

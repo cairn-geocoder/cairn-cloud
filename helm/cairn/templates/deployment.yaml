@@ -1,0 +1,192 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cairn.fullname" . }}
+  labels:
+    {{- include "cairn.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "cairn.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cairn.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "cairn.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+
+      # Bundle source = image: nothing to init.
+      # Bundle source = http:  fetch + (optional) verify before main starts.
+      # Bundle source = pvc:   pre-populated by operator.
+      {{- if eq .Values.bundle.source "http" }}
+      initContainers:
+        - name: bundle-fetch
+          image: alpine/curl:8
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "/scripts/fetch.sh"]
+          volumeMounts:
+            - name: bundle
+              mountPath: /bundle
+            - name: bundle-fetch-script
+              mountPath: /scripts
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+        {{- if and .Values.bundle.verify.enabled .Values.bundle.verify.publicKey }}
+        - name: bundle-verify
+          image: {{ include "cairn.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /usr/local/bin/cairn-build
+            - sign-verify
+            - --bundle
+            - /bundle
+            - --pubkey
+            - /keys/cairn.pub
+          volumeMounts:
+            - name: bundle
+              mountPath: /bundle
+              readOnly: true
+            - name: pubkey
+              mountPath: /keys
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+        {{- end }}
+      {{- end }}
+
+      containers:
+        - name: cairn
+          image: {{ include "cairn.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --bundle
+            - {{ if eq .Values.bundle.source "image" }}/srv/bundle{{ else }}/bundle{{ end }}
+            - --bind
+            - 0.0.0.0:{{ .Values.serve.bindPort }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.serve.bindPort }}
+              protocol: TCP
+          env:
+            {{- if .Values.serve.apiKey }}
+            - name: CAIRN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cairn.fullname" . }}
+                  key: api-key
+            {{- end }}
+            {{- if .Values.serve.rateLimit }}
+            - name: CAIRN_RATE_LIMIT
+              value: {{ .Values.serve.rateLimit | quote }}
+            {{- end }}
+            {{- if .Values.serve.trustForwardedFor }}
+            - name: CAIRN_TRUST_PROXY
+              value: "1"
+            {{- end }}
+            {{- if .Values.serve.trustedProxies }}
+            - name: CAIRN_TRUSTED_PROXIES
+              value: {{ .Values.serve.trustedProxies | quote }}
+            {{- end }}
+            {{- range $k, $v := .Values.extraEnv }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          {{- with .Values.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            {{- if ne .Values.bundle.source "image" }}
+            - name: bundle
+              mountPath: /bundle
+              readOnly: true
+            {{- end }}
+            # readOnlyRootFilesystem=true requires writable tmp.
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        {{- if eq .Values.bundle.source "http" }}
+        - name: bundle
+          emptyDir:
+            sizeLimit: 4Gi
+        - name: bundle-fetch-script
+          configMap:
+            name: {{ include "cairn.fullname" . }}-bundle-fetch
+            defaultMode: 0555
+        {{- end }}
+        {{- if eq .Values.bundle.source "pvc" }}
+        - name: bundle
+          persistentVolumeClaim:
+            claimName: {{ required "bundle.pvc.claimName is required when bundle.source=pvc" .Values.bundle.pvc.claimName }}
+            readOnly: true
+        {{- end }}
+        {{- if and .Values.bundle.verify.enabled .Values.bundle.verify.publicKey }}
+        - name: pubkey
+          secret:
+            secretName: {{ include "cairn.fullname" . }}
+            items:
+              - key: cairn.pub
+                path: cairn.pub
+        {{- end }}
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

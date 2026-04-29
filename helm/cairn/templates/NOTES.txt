@@ -1,0 +1,44 @@
+Cairn is now installed.
+
+Release   : {{ .Release.Name }}
+Namespace : {{ .Release.Namespace }}
+Chart     : {{ .Chart.Name }}-{{ .Chart.Version }}
+App       : {{ .Chart.AppVersion }}
+
+Get the in-cluster URL:
+
+  kubectl -n {{ .Release.Namespace }} get svc {{ include "cairn.fullname" . }}
+
+{{- if contains "ClusterIP" .Values.service.type }}
+
+Port-forward to query locally:
+
+  kubectl -n {{ .Release.Namespace }} port-forward \
+    svc/{{ include "cairn.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+
+  curl 'http://localhost:{{ .Values.service.port }}/v1/search?q=Vaduz&limit=1'
+{{- end }}
+
+{{- if .Values.ingress.enabled }}
+
+Ingress hosts:
+{{- range $host := .Values.ingress.hosts }}
+  {{- range $path := $host.paths }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}{{ $path.path }}
+  {{- end }}
+{{- end }}
+{{- end }}
+
+Run the smoke test:
+
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+Bundle source: {{ .Values.bundle.source }}
+{{- if eq .Values.bundle.source "http" }}
+  URL: {{ .Values.bundle.http.url | default "(unset — set bundle.http.url)" }}
+{{- end }}
+{{- if .Values.bundle.verify.enabled }}
+  Signature verification: enabled (ed25519)
+{{- end }}
+
+For more, see https://github.com/cairn-geocoder/cairn-cloud

@@ -1,0 +1,42 @@
+apiVersion: v2
+name: cairn
+description: |
+  Cairn — offline, airgap-ready geocoder. Deploys cairn-serve fronted by
+  one OSM bundle pulled (or built) at startup, with optional bundle
+  signature verification, Prometheus ServiceMonitor, HPA keyed on RPS,
+  and PodSecurityContext locking the runtime to non-root +
+  read-only-rootfs.
+type: application
+
+# Chart version. Bump on EVERY release. Independent of appVersion so
+# operators can iterate Helm templates without bumping the geocoder.
+version: 0.1.0
+
+# Cairn release this chart targets. Pinned to the upstream release tag.
+appVersion: "0.0.2-alpha"
+
+kubeVersion: ">=1.27.0-0"
+
+home: https://github.com/cairn-geocoder/cairn-cloud
+sources:
+  - https://github.com/cairn-geocoder/cairn
+  - https://github.com/cairn-geocoder/cairn-cloud
+
+keywords:
+  - geocoder
+  - geocoding
+  - osm
+  - openstreetmap
+  - airgap
+  - rust
+  - cairn
+
+maintainers:
+  - name: Cairn maintainers
+    url: https://github.com/cairn-geocoder
+
+annotations:
+  artifacthub.io/license: MIT
+  artifacthub.io/changes: |
+    - kind: added
+      description: Initial Helm chart release for cairn-serve.

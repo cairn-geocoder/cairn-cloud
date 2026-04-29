@@ -1,0 +1,185 @@
+# Default values for cairn.
+#
+# Cairn's runtime hot RSS is ~100 MB on a country-scale bundle, so the
+# resource defaults below are deliberately tiny — bump only if you've
+# proven you need it. The bundle init container does the heavy lifting
+# at startup; cairn-serve itself is a single mmap'd Rust binary.
+
+image:
+  repository: ghcr.io/cairn-geocoder/cairn
+  # Pinned to the chart's appVersion by default; override for testing.
+  tag: ""           # Defaults to .Chart.AppVersion when empty.
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+# ---------------------------------------------------------------------
+# Bundle source. Pick exactly one of:
+#   bundle.source: image       — bundle baked into the cairn image
+#   bundle.source: http        — pulled from a URL by initContainer
+#   bundle.source: pvc         — pre-populated PersistentVolumeClaim
+# ---------------------------------------------------------------------
+bundle:
+  source: image
+  # http source — must be a tar.gz of the bundle directory.
+  http:
+    url: ""        # e.g. https://bundles.example.com/switzerland.tar.gz
+    sha256: ""     # OPTIONAL but strongly recommended. Init verifies.
+  # pvc source — name of an existing PVC mounted at /bundle.
+  pvc:
+    claimName: ""
+  # ed25519 signature verification (cairn-build sign-verify). When
+  # bundle.verify.publicKey is set, a second initContainer runs
+  # `cairn-build sign-verify --bundle /bundle --pubkey /keys/cairn.pub`
+  # and refuses to start if the signature doesn't match.
+  verify:
+    enabled: false
+    publicKey: ""  # base64-encoded ed25519 public key, 32 bytes raw.
+
+# ---------------------------------------------------------------------
+# cairn-serve runtime config (passed via env or CLI args).
+# ---------------------------------------------------------------------
+serve:
+  bindPort: 8080
+  # Optional API key. When set, /v1/* requires X-API-Key.
+  apiKey: ""
+  # Per-IP token bucket. Format "rate,burst" (e.g. "10,20"). Empty = off.
+  rateLimit: ""
+  # X-Forwarded-For trust. ON behind a known reverse proxy ONLY.
+  trustForwardedFor: false
+  # CIDR allowlist of trusted proxies. Comma-separated.
+  trustedProxies: ""
+
+# ---------------------------------------------------------------------
+# Replicas + Pod-level security.
+# ---------------------------------------------------------------------
+replicaCount: 1
+
+# PodSecurityContext — non-root + read-only rootfs by default. The
+# bundle volume is the only writable mount.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# ---------------------------------------------------------------------
+# Service + Ingress.
+# ---------------------------------------------------------------------
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: cairn.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# ---------------------------------------------------------------------
+# Resources. Defaults sized for one country-scale bundle (~500MB OSM
+# PBF input, ~200MB on-disk bundle, ~100MB hot RSS).
+# ---------------------------------------------------------------------
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
+# ---------------------------------------------------------------------
+# Autoscaling — keyed on Prometheus RPS via prometheus-adapter when
+# available; falls back to CPU when not.
+# ---------------------------------------------------------------------
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  # When prometheus-adapter is installed, use a custom metric instead.
+  customMetric:
+    enabled: false
+    name: cairn_http_requests_per_second
+    targetAverageValue: "1000"
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# ---------------------------------------------------------------------
+# Prometheus ServiceMonitor (kube-prometheus-stack).
+# ---------------------------------------------------------------------
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+  honorLabels: false
+
+# ---------------------------------------------------------------------
+# Probes — point at the dedicated /healthz + /readyz endpoints baked
+# into cairn-serve so the kubelet can distinguish "alive" from
+# "bundle still loading".
+# ---------------------------------------------------------------------
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: http
+  initialDelaySeconds: 2
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# ---------------------------------------------------------------------
+# Networking + scheduling extras.
+# ---------------------------------------------------------------------
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+priorityClassName: ""
+
+# ---------------------------------------------------------------------
+# Service account.
+# ---------------------------------------------------------------------
+serviceAccount:
+  create: true
+  automount: false   # cairn-serve doesn't need K8s API access.
+  annotations: {}
+  name: ""
+
+# ---------------------------------------------------------------------
+# Extra environment variables (str -> str).
+# ---------------------------------------------------------------------
+extraEnv: {}
+extraEnvFrom: []
+podAnnotations: {}
+podLabels: {}

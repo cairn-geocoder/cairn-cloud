@@ -1,0 +1,68 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  helm-lint:
+    name: Helm lint + template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+      - name: helm lint
+        run: helm lint helm/cairn
+      - name: helm template (default values)
+        run: |
+          helm template cairn helm/cairn > /tmp/cairn-default.yaml
+          test -s /tmp/cairn-default.yaml
+      - name: helm template (http bundle + verify)
+        run: |
+          helm template cairn helm/cairn \
+            --set bundle.source=http \
+            --set bundle.http.url=https://example.com/switzerland.tar.gz \
+            --set bundle.verify.enabled=true \
+            --set bundle.verify.publicKey=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
+            > /tmp/cairn-http.yaml
+          grep -q "kind: Deployment" /tmp/cairn-http.yaml
+          grep -q "bundle-fetch" /tmp/cairn-http.yaml
+          grep -q "bundle-verify" /tmp/cairn-http.yaml
+      - name: helm template (full prod overlay)
+        run: |
+          helm template cairn helm/cairn \
+            --set ingress.enabled=true \
+            --set autoscaling.enabled=true \
+            --set serviceMonitor.enabled=true \
+            --set podDisruptionBudget.enabled=true \
+            --set replicaCount=3 \
+            > /tmp/cairn-prod.yaml
+          grep -q "kind: HorizontalPodAutoscaler" /tmp/cairn-prod.yaml
+          grep -q "kind: ServiceMonitor" /tmp/cairn-prod.yaml
+          grep -q "kind: PodDisruptionBudget" /tmp/cairn-prod.yaml
+          grep -q "kind: Ingress" /tmp/cairn-prod.yaml
+
+  kubeconform:
+    name: kubeconform manifest validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+      - name: install kubeconform
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | tar xz -C /usr/local/bin kubeconform
+      - name: kubeconform on default render
+        run: |
+          helm template cairn helm/cairn | \
+            kubeconform -strict -summary -kubernetes-version 1.30.0 \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
