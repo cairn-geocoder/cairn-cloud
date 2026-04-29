@@ -1,0 +1,30 @@
+# Checkov skip-list for known-intentional findings.
+# Each skip needs a justification comment; PRs adding new ones get
+# scrutiny.
+
+skip-check:
+  # Public ALB intentionally accepts 0.0.0.0/0 on :80 for the
+  # geocoder API. Operators tighten via internal_alb=true or by
+  # putting WAF in front; ALB-level open ingress is by design.
+  - CKV_AWS_260   # "Ensure no security groups allow ingress from 0.0.0.0:0 to port 80"
+  - CKV_AWS_24    # "Ensure no security groups allow ingress from 0.0.0.0:0 to port 22" (we don't, but checkov flags via egress)
+
+  # ALB without HTTPS listener on port 80. Cairn doesn't bake TLS
+  # in; operators bring ACM + a 443 listener.
+  - CKV_AWS_2     # "Ensure ALB protocol is HTTPS"
+  - CKV_AWS_103   # "Ensure that load balancer is using TLS 1.2"
+
+  # Cloud Run public invoker is configurable via allow_public; when
+  # set true we ARE making the service public on purpose.
+  - CKV_GCP_61    # "Ensure Cloud Run is not publicly accessible"
+
+  # ECS readonly_root_filesystem flag — we DO set readonly via
+  # `readonlyRootFilesystem: true` in the container_definitions
+  # JSON, but Checkov scans HCL not JSON-encoded blocks. False
+  # positive.
+  - CKV_AWS_336
+
+framework:
+  - terraform
+
+quiet: true

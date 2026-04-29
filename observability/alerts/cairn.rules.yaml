@@ -1,0 +1,116 @@
+# Prometheus alerting rules for Cairn. Drop into your kube-prometheus-
+# stack (or any Prometheus) under spec.groups. Rules use only the
+# metrics cairn-serve actually emits — see /metrics endpoint:
+#   * cairn_uptime_seconds (gauge)
+#   * cairn_admin_features (gauge)
+#   * cairn_point_count (gauge)
+#   * cairn_requests_total{endpoint, outcome} (counter)
+#
+# Severity convention:
+#   critical — page on-call
+#   warning  — investigate same-day
+#   info     — visible on the dashboard, no page
+
+groups:
+  - name: cairn
+    interval: 30s
+    rules:
+
+      # ── Liveness ─────────────────────────────────────────────
+      - alert: CairnDown
+        expr: absent(cairn_uptime_seconds) or up{job=~".*cairn.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: cairn
+        annotations:
+          summary: "Cairn appears down"
+          description: "No /metrics scrape from any cairn instance for 2m."
+
+      - alert: CairnRestartedRecently
+        expr: cairn_uptime_seconds < 60
+        for: 0s
+        labels:
+          severity: info
+          service: cairn
+        annotations:
+          summary: "Cairn restarted (uptime < 60 s)"
+          description: "Bundle reload, OOM, or upstream redeploy."
+
+      # ── Bundle integrity / capacity ──────────────────────────
+      - alert: CairnEmptyAdminLayer
+        expr: cairn_admin_features == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: cairn
+        annotations:
+          summary: "Cairn loaded a bundle with zero admin polygons"
+          description: "Reverse PIP path will always 404. Verify the bundle's spatial layer integrity."
+
+      - alert: CairnEmptyPointLayer
+        expr: cairn_point_count == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: cairn
+        annotations:
+          summary: "Cairn nearest fallback layer is empty"
+          description: "Reverse-geocoder fallback won't fire. Confirm the build pipeline didn't drop the point layer."
+
+      # ── Error rates ──────────────────────────────────────────
+      - alert: CairnSearchErrorRateHigh
+        expr: |
+          sum(rate(cairn_requests_total{endpoint="search",outcome="err"}[5m]))
+          /
+          clamp_min(sum(rate(cairn_requests_total{endpoint="search"}[5m])), 1)
+          > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          service: cairn
+        annotations:
+          summary: "Cairn search error rate > 5% (5m avg)"
+          description: "Investigate /v1/search errors — likely bad query parsing or text-index regression."
+
+      - alert: CairnStructuredErrorRateHigh
+        expr: |
+          sum(rate(cairn_requests_total{endpoint="structured",outcome="err"}[5m]))
+          /
+          clamp_min(sum(rate(cairn_requests_total{endpoint="structured"}[5m])), 1)
+          > 0.10
+        for: 10m
+        labels:
+          severity: warning
+          service: cairn
+        annotations:
+          summary: "Cairn /v1/structured error rate > 10% (5m avg)"
+
+      # ── Reverse-PIP coverage ─────────────────────────────────
+      # Empty-result rate above 25% suggests the bundle's polygon coverage
+      # doesn't match where queries are landing. Catches "wrong country
+      # bundle deployed" sooner than user-side complaints.
+      - alert: CairnReverseEmptyRateHigh
+        expr: |
+          sum(rate(cairn_requests_total{endpoint="reverse",outcome="empty"}[15m]))
+          /
+          clamp_min(sum(rate(cairn_requests_total{endpoint="reverse"}[15m])), 1)
+          > 0.25
+        for: 30m
+        labels:
+          severity: warning
+          service: cairn
+        annotations:
+          summary: "Cairn reverse-geocoder empty-result rate > 25% (15m)"
+          description: "Bundle coverage may not match the query distribution. Confirm the deployed bundle is for the right region."
+
+      # ── Bad-request flood ────────────────────────────────────
+      - alert: CairnBadRequestFlood
+        expr: rate(cairn_requests_total{outcome="bad"}[5m]) > 50
+        for: 10m
+        labels:
+          severity: warning
+          service: cairn
+        annotations:
+          summary: "Cairn 400-response rate > 50/s (5m)"
+          description: "Either a misconfigured client or an attempted query-grammar exploit."

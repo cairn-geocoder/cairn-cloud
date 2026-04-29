@@ -49,10 +49,11 @@ signature-verification path.
 | `kustomize/base/`               | **shipped** — flat manifests (Namespace + SA + CM x2 + Svc + Deployment) |
 | `kustomize/overlays/dev/`       | **shipped** — single replica, NodePort :30080, no ingress |
 | `kustomize/overlays/prod/`      | **shipped** — 3 replicas, HPA, PDB, Ingress, NetworkPolicy egress lockdown |
-| `terraform/modules/cairn-aws/`  | scoped, not implemented |
-| `terraform/modules/cairn-gcp/`  | scoped, not implemented |
-| `terraform/modules/cairn-bare/` | scoped, not implemented |
-| `observability/`                | scoped, not implemented |
+| `terraform/modules/cairn-aws/`  | **shipped** — ECS Fargate + ALB + CloudWatch + IAM + App Auto Scaling |
+| `terraform/modules/cairn-gcp/`  | **shipped** — Cloud Run v2 + GCS-backed bundle + service account |
+| `terraform/modules/cairn-bare/` | **shipped** — Nomad service job + Consul registration + bundle prestart |
+| `observability/`                | **shipped** — Grafana dashboard + 7 PrometheusRule entries |
+| `.github/renovate.json`         | **shipped** — daily auto-bump for Helm, Terraform, GH Actions, Cairn image |
 | `examples/`                     | scoped, not implemented |
 
 ## Kustomize quickstart
@@ -68,6 +69,52 @@ kubectl apply -k kustomize/overlays/prod
 Edit the `cairn-bundle-config` ConfigMap in the overlay you're using
 to point at your bundle URL + sha256 before applying. The
 `bundle-fetch` init container fails closed on sha256 mismatch.
+
+## Terraform quickstart
+
+```hcl
+# AWS — ECS Fargate + ALB
+module "cairn" {
+  source             = "github.com/cairn-geocoder/cairn-cloud//terraform/modules/cairn-aws?ref=main"
+  vpc_id             = aws_vpc.this.id
+  public_subnet_ids  = aws_subnet.public[*].id
+  private_subnet_ids = aws_subnet.private[*].id
+  bundle_url         = "https://bundles.example.com/cairn/switzerland-v0.0.2-alpha.tar.gz"
+  bundle_sha256      = "<sha256>"
+}
+
+# GCP — Cloud Run + GCS
+module "cairn" {
+  source            = "github.com/cairn-geocoder/cairn-cloud//terraform/modules/cairn-gcp?ref=main"
+  project_id        = "my-gcp-project"
+  bundle_gcs_bucket = "cairn-bundles"
+  bundle_object     = "switzerland-v0.0.2-alpha.tar.gz"
+}
+
+# Nomad + Consul — kubernetes-free path
+module "cairn" {
+  source         = "github.com/cairn-geocoder/cairn-cloud//terraform/modules/cairn-bare?ref=main"
+  bundle_url     = "https://bundles.example.com/cairn/switzerland-v0.0.2-alpha.tar.gz"
+  bundle_sha256  = "<sha256>"
+  instance_count = 2
+}
+```
+
+Each module's README documents inputs, outputs, and ops gotchas.
+
+## Observability
+
+Drop the Grafana dashboard JSON into your kube-prometheus-stack
+config-map and apply the alerting rules with:
+
+```sh
+kubectl apply -f observability/alerts/cairn.rules.yaml
+```
+
+7 alerts cover liveness, empty admin / point layer, search +
+structured error rates above 5% / 10%, reverse-empty-result rate
+above 25%, and 4xx flood. Wired only to metrics cairn-serve actually
+emits.
 
 Contributions for any of the unimplemented paths are welcome — see
 [`CONTRIBUTING.md`](CONTRIBUTING.md).

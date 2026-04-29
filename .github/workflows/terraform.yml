@@ -1,0 +1,95 @@
+name: terraform
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform.yml"
+  pull_request:
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform.yml"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  fmt:
+    name: terraform fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - run: terraform fmt -check -recursive terraform/
+
+  validate:
+    name: terraform validate (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - cairn-aws
+          - cairn-gcp
+          - cairn-bare
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - name: terraform init
+        run: terraform -chdir=terraform/modules/${{ matrix.module }} init -backend=false -input=false
+      - name: terraform validate
+        run: terraform -chdir=terraform/modules/${{ matrix.module }} validate
+
+  tflint:
+    name: tflint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - cairn-aws
+          - cairn-gcp
+          - cairn-bare
+    steps:
+      - uses: actions/checkout@v4
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.55.1
+      - name: init
+        run: tflint --init
+        working-directory: terraform/modules/${{ matrix.module }}
+      - name: lint
+        run: tflint -f compact
+        working-directory: terraform/modules/${{ matrix.module }}
+
+  tfsec:
+    name: tfsec
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: terraform/
+          # Cairn-cloud is a public reusable module collection;
+          # operator overlays tighten security beyond defaults.
+          # We surface findings (informational) but don't block CI.
+          soft_fail: true
+
+  checkov:
+    name: checkov
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bridgecrewio/checkov-action@master
+        with:
+          directory: terraform/
+          framework: terraform
+          quiet: true
+          config_file: .checkov.yml
+          soft_fail: true

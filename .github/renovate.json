@@ -1,0 +1,45 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":timezone(Europe/Zurich)"
+  ],
+  "labels": ["deps"],
+  "rangeStrategy": "bump",
+  "schedule": ["before 5am every weekday"],
+  "prHourlyLimit": 4,
+  "prConcurrentLimit": 6,
+
+  "packageRules": [
+    {
+      "matchManagers": ["helmv3", "helm-values"],
+      "groupName": "helm chart deps"
+    },
+    {
+      "matchManagers": ["terraform"],
+      "groupName": "terraform providers + modules"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions"
+    },
+    {
+      "description": "Cairn upstream image — auto-merge patch bumps once CI is green.",
+      "matchPackageNames": ["ghcr.io/cairn-geocoder/cairn"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true
+    }
+  ],
+
+  "regexManagers": [
+    {
+      "fileMatch": ["^helm/cairn/Chart\\.yaml$", "^helm/cairn/values\\.yaml$"],
+      "matchStrings": [
+        "ghcr\\.io/cairn-geocoder/cairn:(?<currentValue>[^\"\\s]+)"
+      ],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "ghcr.io/cairn-geocoder/cairn"
+    }
+  ]
+}
